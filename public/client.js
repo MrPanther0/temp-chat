@@ -1,56 +1,87 @@
-let room = location.pathname.replace("/", "") || "lobby";
-let ws = connect(room);
+const room = location.pathname.replace("/", "") || "lobby";
+function nameColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const colors = [
+    "#6cf", "#f66", "#6f6", "#fc6",
+    "#c6f", "#f6c", "#66f", "#6ff"
+  ];
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
+// Prompt for name (temporary)
+const name = prompt("Enter your name (temporary):")?.trim() || "anon";
+
+const ws = new WebSocket(
+  (location.protocol === "https:" ? "wss://" : "ws://") +
+  location.host + "/" + room
+);
 
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 
-function connect(roomName) {
-  const socket = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/" + roomName
-  );
-
-  socket.onmessage = e => {
-    const msg = JSON.parse(e.data);
-    if (msg.type === "system") {
-      add(`* ${msg.text}`, "system");
-    } else {
-      add(`<span class="nick">${msg.nick}</span>: ${msg.text}`);
-    }
-  };
-
-  return socket;
-}
-
 function add(text, cls = "") {
   const div = document.createElement("div");
   div.className = cls;
-  div.innerHTML = text;
+  div.textContent = text;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
 
-function newRoom() {
-  if (ws) ws.close();
-  chat.innerHTML = "";
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: "setname",
+    name: name.substring(0, 20)
+  }));
+};
 
-  room = Math.random().toString(36).substring(2, 8);
-  history.pushState({}, "", "/" + room);
-  ws = connect(room);
+ws.onmessage = e => {
+  const msg = JSON.parse(e.data);
 
-  add(`* created new room: /${room}`, "system");
-}
+  switch (msg.type) {
+    case "system":
+      add(`* ${msg.text}`, "system");
+      break;
+
+    case "chat":
+      const span = document.createElement("span");
+span.textContent = msg.name;
+span.style.color = nameColor(msg.name);
+
+const div = document.createElement("div");
+div.appendChild(span);
+div.appendChild(document.createTextNode(`: ${msg.text}`));
+
+chat.appendChild(div);
+chat.scrollTop = chat.scrollHeight;
+      break;
+
+    default:
+      // ignore unknown packets
+      break;
+  }
+};
+
 
 input.addEventListener("keydown", e => {
-  if (e.key === "Enter" && input.value.trim()) {
-    const value = input.value.trim();
+  if (e.key !== "Enter" || !input.value.trim()) return;
 
-    if (value === "/new") {
-      newRoom();
-    } else {
-      ws.send(value);
-    }
+  const value = input.value.trim();
 
-    input.value = "";
+  if (value === "/clear") {
+    chat.innerHTML = "";
+  } else if (value === "/help") {
+    ws.send(JSON.stringify({ type: "command", cmd: "help" }));
+  } else {
+    ws.send(JSON.stringify({
+      type: "chat",
+      text: value
+    }));
   }
+
+  input.value = "";
 });
