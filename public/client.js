@@ -5,9 +5,8 @@ const room = location.pathname.replace("/", "") || "lobby";
  * - Render / Vercel: CHAT_BACKEND is injected
  * - Railway: fallback to same host
  */
-const BACKEND =
-  window.CHAT_BACKEND ||
-  location.host;
+const BACKEND = window.CHAT_BACKEND || location.host;
+
 
 // Username color hashing
 function nameColor(name) {
@@ -105,3 +104,4 @@ document.addEventListener("click", focusInput);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) focusInput();
 });
+
